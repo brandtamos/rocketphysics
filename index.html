@@ -1,77 +1,275 @@
 <html>
 <head>
+<script   src="https://code.jquery.com/jquery-3.1.0.min.js"   integrity="sha256-cCueBR6CsyA4/9szpPfrX3s49M9vUU5BgtiJj06wt/s="   crossorigin="anonymous"></script>
 <script src="js/matter.js"></script>
 </head>
 <body>
-
+<button id="runDownrangeButton">Downrange Landing</button>
+<button id="runRTLSButton">Return To Landing Site</button>
+<br />
+Phase: <input type="text" id="phase" />
+<br />
+Counter: <input type="text" id="counter" />
+<br />
+Angle: <input type="text" id="angle" />
+<div id="simspace"></div>
 </body>
 <script>
-// Matter.js module aliases
-var Engine = Matter.Engine,
-    World = Matter.World,
-    Bodies = Matter.Bodies,
-	Body = Matter.Body,
-	Runner = Matter.Runner;
+$(document).ready(function(){
+	$('#runDownrangeButton').click(function(){
+		$('#simspace').html('');
+		runDownRangeLandingSim();
+	});
+	$('#runRTLSButton').click(function(){
+		$('#simspace').html('');
+		runRTLSSim();
+	});
+});
+function runDownRangeLandingSim(){
+	// Matter.js module aliases
+	var Engine = Matter.Engine,
+	    World = Matter.World,
+	    Bodies = Matter.Bodies,
+		Body = Matter.Body,
+		Runner = Matter.Runner;
 
-// create a Matter.js engine
-var engine = Engine.create(document.body);
+	// create a Matter.js engine
+	var engine = Engine.create(document.getElementById('simspace'));
 
-//set gravity
-engine.world.gravity.y = 0.1;
+	//set gravity
+	engine.world.gravity.y = 0.1;
 
-var launchPhase = 'launch';
+	var launchPhase = 'countdown';
 
-// create two boxes and a ground
-//var boxA = Bodies.rectangle(400, 200, 80, 80);
-var rocket = Bodies.rectangle(100, 560, 20, 100);
-var ground = Bodies.rectangle(400, 610, 810, 60, { isStatic: true });
+	// create two boxes and a ground
+	//var boxA = Bodies.rectangle(400, 200, 80, 80);
+	var rocket = Bodies.rectangle(50, 560, 20, 100);
+	var ground = Bodies.rectangle(400, 610, 810, 60, { isStatic: true });
 
-//set mass of the rocket to a constant for ease of fiddlin'
-Body.setMass(rocket, 10.0);
-// add all of the bodies to the world
-World.add(engine.world, [rocket, ground]);
+	//set mass of the rocket to a constant for ease of fiddlin'
+	Body.setMass(rocket, 10.0);
+	rocket.frictionAir = 0;
+	// add all of the bodies to the world
+	World.add(engine.world, [rocket, ground]);
 
-//create the runner
-var runner = Runner.create();
-var counter = 0;
-draw();
+	//create the runner
+	var runner = Runner.create();
+	var counter = 0;
+	draw();
 
-function draw(){         
-	Runner.tick(runner, engine, 1000/60);
-	//ascent
-	if(launchPhase == 'launch'){
-		//pitch kick
-		if(counter == 0){
-			Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y -50 }, {x: 0.02, y: 0});
+	function draw(){         
+		Runner.tick(runner, engine, 1000/60);
+		if(launchPhase == 'countdown'){
+			counter++;
+			if(counter == 50){
+				counter = 0;
+				launchPhase = "launch";
+			}
 		}
-		Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y}, {x: 0.001, y: -0.002});
-		counter++;
-		if(counter == 120){ 
-			counter = 0;
-			launchPhase = 'coast';
+		//ascent
+		else if(launchPhase == 'launch'){
+			//pitch kick
+			//thrust up, pitch over
+			if(counter == 60) Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: 0.004, y: 0});
+			thrustRocket(100);
+			counter++;
+			if(counter == 200){ 
+				counter = 0;
+				launchPhase = 'flip';
+			}
 		}
+		
+		//coast + flip
+		else if(launchPhase == 'flip'){
+			//begin flip
+			if(counter == 0){
+				Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: -0.015, y: 0});
+			}
+			counter++;
+			if(counter == 100){ 
+				//arrest flip
+				Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: 0.01, y: 0});
+				counter = 0;
+				launchPhase = 'boostback-burn';
+			}
+		}
+		
+		//boostback burn, kill of horizontal velocity
+		else if(launchPhase == 'boostback-burn'){
+			counter++;
+			thrustRocket(100);
+			if(counter == 80){ 
+				counter = 0;
+				launchPhase = 're-entry';
+			}
+		}
+
+		//re-entry, basically just freefall
+
+		else if(launchPhase == 're-entry'){
+			if(counter == 5) Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: 0.02, y: 0});
+			if(counter == 40) Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: -0.0195, y: 0});
+			counter++;
+			if(counter == 80){ 
+				counter = 0;
+				launchPhase = 'landing-burn';
+			}
+		}
+		//propulsive landing
+		else if(launchPhase == 'landing-burn'){
+			counter++;
+			
+			thrustRocket(240);
+			if(counter == 45){ 
+				counter = 0;
+				launchPhase = 'completed';
+			}
+		}
+		updateDisplay();
+	    requestAnimationFrame(draw);
 	}
-	//coast + flip
-	else if(launchPhase == 'coast'){
-		if(counter == 0){
-			Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: -0.02, y: 0});
-		}
-		counter++;
-		if(counter == 40){ 
-			counter = 0;
-			launchPhase = 'landing-burn';
-		}
+	function updateDisplay(){
+		$('#phase').val(launchPhase);
+		$('#counter').val(counter);
+		$('#angle').val(rocket.angle);
 	}
-	//propulsive landing
-	/*else if(launchPhase == 'landing-burn'){
-		counter++;
-		Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y}, {x: -0.002, y: -0.012});
-		if(counter == 50){ 
-			counter = 0;
-			launchPhase = 'completed';
+	function thrustRocket(percentage){
+		Body.applyForce(
+			rocket, 
+			{
+				x: rocket.position.x, 
+				y: rocket.position.y
+			}, 
+			{
+				x: 0.0016 * Math.sin(rocket.angle) * (percentage / 100), 
+				y: -0.0016 * Math.cos(rocket.angle) * (percentage / 100)
+			}
+		);
+	}
+}
+
+function runRTLSSim(){
+	// Matter.js module aliases
+	var Engine = Matter.Engine,
+	    World = Matter.World,
+	    Bodies = Matter.Bodies,
+		Body = Matter.Body,
+		Runner = Matter.Runner;
+
+	// create a Matter.js engine
+	var engine = Engine.create(document.getElementById('simspace'));
+
+	//set gravity
+	engine.world.gravity.y = 0.1;
+
+	var launchPhase = 'countdown';
+
+	// create two boxes and a ground
+	//var boxA = Bodies.rectangle(400, 200, 80, 80);
+	var rocket = Bodies.rectangle(50, 560, 20, 100);
+	var ground = Bodies.rectangle(400, 610, 810, 60, { isStatic: true });
+
+	//set mass of the rocket to a constant for ease of fiddlin'
+	Body.setMass(rocket, 10.0);
+	rocket.frictionAir = 0;
+	// add all of the bodies to the world
+	World.add(engine.world, [rocket, ground]);
+
+	//create the runner
+	var runner = Runner.create();
+	var counter = 0;
+	draw();
+
+	function draw(){         
+		Runner.tick(runner, engine, 1000/60);
+		if(launchPhase == 'countdown'){
+			counter++;
+			if(counter == 50){
+				counter = 0;
+				launchPhase = "launch";
+			}
 		}
-	}*/
-    requestAnimationFrame(draw);
+		//ascent
+		else if(launchPhase == 'launch'){
+			//pitch kick
+			//thrust up, pitch over
+			if(counter == 60) Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: 0.004, y: 0});
+			thrustRocket(100);
+			counter++;
+			if(counter == 200){ 
+				counter = 0;
+				launchPhase = 'flip';
+			}
+		}
+		
+		//coast + flip
+		else if(launchPhase == 'flip'){
+			//begin flip
+			if(counter == 0){
+				Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: -0.015, y: 0});
+			}
+			counter++;
+			if(counter == 100){ 
+				//arrest flip
+				Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: 0.01, y: 0});
+				counter = 0;
+				launchPhase = 'boostback-burn';
+			}
+		}
+		
+		//boostback burn, kill of horizontal velocity
+		else if(launchPhase == 'boostback-burn'){
+			counter++;
+			thrustRocket(200);
+			if(counter == 80){ 
+				counter = 0;
+				launchPhase = 're-entry';
+			}
+		}
+
+		//re-entry, basically just freefall
+
+		else if(launchPhase == 're-entry'){
+			if(counter == 5) Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: 0.02, y: 0});
+			if(counter == 60) Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: -0.0195, y: 0});
+			counter++;
+			if(counter == 80){ 
+				counter = 0;
+				launchPhase = 'landing-burn';
+			}
+		}
+		//propulsive landing
+		else if(launchPhase == 'landing-burn'){
+			counter++;
+			if(counter == 80) Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: -0.006, y: 0});
+			thrustRocket(100);
+			if(counter == 150){ 
+				Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: 0.005, y: 0});
+				counter = 0;
+				launchPhase = 'completed';
+			}
+		}
+		updateDisplay();
+	    requestAnimationFrame(draw);
+	}
+	function updateDisplay(){
+		$('#phase').val(launchPhase);
+		$('#counter').val(counter);
+		$('#angle').val(rocket.angle);
+	}
+	function thrustRocket(percentage){
+		Body.applyForce(
+			rocket, 
+			{
+				x: rocket.position.x, 
+				y: rocket.position.y
+			}, 
+			{
+				x: 0.0016 * Math.sin(rocket.angle) * (percentage / 100), 
+				y: -0.0016 * Math.cos(rocket.angle) * (percentage / 100)
+			}
+		);
+	}
 }
 </script>
 </html>
