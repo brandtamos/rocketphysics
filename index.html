@@ -1,0 +1,77 @@
+<html>
+<head>
+<script src="js/matter.js"></script>
+</head>
+<body>
+
+</body>
+<script>
+// Matter.js module aliases
+var Engine = Matter.Engine,
+    World = Matter.World,
+    Bodies = Matter.Bodies,
+	Body = Matter.Body,
+	Runner = Matter.Runner;
+
+// create a Matter.js engine
+var engine = Engine.create(document.body);
+
+//set gravity
+engine.world.gravity.y = 0.1;
+
+var launchPhase = 'launch';
+
+// create two boxes and a ground
+//var boxA = Bodies.rectangle(400, 200, 80, 80);
+var rocket = Bodies.rectangle(100, 560, 20, 100);
+var ground = Bodies.rectangle(400, 610, 810, 60, { isStatic: true });
+
+//set mass of the rocket to a constant for ease of fiddlin'
+Body.setMass(rocket, 10.0);
+// add all of the bodies to the world
+World.add(engine.world, [rocket, ground]);
+
+//create the runner
+var runner = Runner.create();
+var counter = 0;
+draw();
+
+function draw(){         
+	Runner.tick(runner, engine, 1000/60);
+	//ascent
+	if(launchPhase == 'launch'){
+		//pitch kick
+		if(counter == 0){
+			Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y -50 }, {x: 0.02, y: 0});
+		}
+		Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y}, {x: 0.001, y: -0.002});
+		counter++;
+		if(counter == 120){ 
+			counter = 0;
+			launchPhase = 'coast';
+		}
+	}
+	//coast + flip
+	else if(launchPhase == 'coast'){
+		if(counter == 0){
+			Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y - 50}, {x: -0.02, y: 0});
+		}
+		counter++;
+		if(counter == 40){ 
+			counter = 0;
+			launchPhase = 'landing-burn';
+		}
+	}
+	//propulsive landing
+	/*else if(launchPhase == 'landing-burn'){
+		counter++;
+		Body.applyForce(rocket, {x: rocket.position.x, y: rocket.position.y}, {x: -0.002, y: -0.012});
+		if(counter == 50){ 
+			counter = 0;
+			launchPhase = 'completed';
+		}
+	}*/
+    requestAnimationFrame(draw);
+}
+</script>
+</html>
